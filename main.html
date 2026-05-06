@@ -1,0 +1,1647 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>AlcoShield — Smart Alcohol Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Bebas+Neue&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>emailjs.init("KDVtdm08DphYPRaof");</script>
+<style>
+:root {
+  --bg: #040408;
+  --surface: #0a0a12;
+  --surface2: #10101c;
+  --border: #1c1c2e;
+  --border2: #252540;
+  --text: #e8e8f0;
+  --muted: #6868a0;
+  --muted2: #44446a;
+  --primary: #6c47ff;
+  --primary2: #8b6fff;
+  --accent: #00d4ff;
+  --success: #00e676;
+  --warning: #ffab00;
+  --danger: #ff3d71;
+  --critical: #ff1744;
+  --glow-p: rgba(108,71,255,0.3);
+  --glow-a: rgba(0,212,255,0.2);
+  --glow-s: rgba(0,230,118,0.2);
+  --glow-d: rgba(255,61,113,0.3);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+.ambient{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.ambient-blob{position:absolute;border-radius:50%;filter:blur(120px);opacity:0.12}
+.ambient-blob:nth-child(1){width:600px;height:600px;background:var(--primary);top:-200px;left:-200px;animation:drift1 20s ease-in-out infinite}
+.ambient-blob:nth-child(2){width:400px;height:400px;background:var(--accent);top:50%;right:-150px;animation:drift2 15s ease-in-out infinite}
+.ambient-blob:nth-child(3){width:300px;height:300px;background:var(--primary);bottom:-100px;left:40%;animation:drift3 18s ease-in-out infinite}
+@keyframes drift1{0%,100%{transform:translate(0,0)}50%{transform:translate(60px,40px)}}
+@keyframes drift2{0%,100%{transform:translate(0,0)}50%{transform:translate(-40px,60px)}}
+@keyframes drift3{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-50px)}}
+
+body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(108,71,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(108,71,255,0.03) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0}
+
+h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif;font-weight:700;letter-spacing:-0.03em}
+
+.glass{background:rgba(10,10,18,0.7);border:1px solid var(--border2);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-radius:16px;position:relative;overflow:hidden}
+.glass::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.04) 0%,transparent 60%);pointer-events:none}
+
+.container{max-width:1200px;margin:0 auto;padding:0 24px 60px;position:relative;z-index:1}
+
+.auth-wrap{min-height:100vh;display:grid;place-items:center;padding:24px;position:relative;z-index:1}
+.auth-card{width:100%;max-width:460px;padding:40px}
+
+.brand{display:flex;align-items:center;gap:14px;margin-bottom:32px}
+.brand-icon{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,var(--primary),var(--accent));display:grid;place-items:center;font-family:'Bebas Neue',sans-serif;font-size:26px;color:#fff;box-shadow:0 0 30px var(--glow-p),0 0 60px rgba(108,71,255,0.15);letter-spacing:0}
+.brand-name{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:0.05em;background:linear-gradient(90deg,var(--text),var(--muted));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.brand-sub{font-size:11px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;margin-top:2px;font-weight:400}
+
+.tab-row{display:flex;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:24px;gap:4px}
+.tab-btn{flex:1;padding:10px;text-align:center;border-radius:9px;cursor:pointer;color:var(--muted);font-weight:600;font-size:13px;transition:all .25s;letter-spacing:0.02em}
+.tab-btn.active{background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;box-shadow:0 4px 20px var(--glow-p)}
+
+label{display:block;font-size:11px;color:var(--muted);margin:14px 0 5px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase}
+input,select,textarea{width:100%;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--border2);color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:14px;outline:none;transition:.2s}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--glow-p)}
+select option{background:#0a0a12}
+textarea{resize:vertical;min-height:90px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 20px;border-radius:10px;border:none;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13px;transition:all .2s;white-space:nowrap;letter-spacing:0.02em}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;box-shadow:0 4px 20px var(--glow-p)}
+.btn-primary:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 8px 32px var(--glow-p)}
+.btn-ghost{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid var(--border2)}
+.btn-ghost:hover{background:rgba(255,255,255,0.09)}
+.btn-danger{background:rgba(255,61,113,0.12);color:var(--danger);border:1px solid rgba(255,61,113,0.3)}
+.btn-danger:hover{background:rgba(255,61,113,0.22)}
+.btn-success{background:rgba(0,230,118,0.12);color:var(--success);border:1px solid rgba(0,230,118,0.3)}
+.btn-success:hover{background:rgba(0,230,118,0.22)}
+.btn-warn{background:rgba(255,171,0,0.12);color:var(--warning);border:1px solid rgba(255,171,0,0.3)}
+.btn-sm{padding:7px 14px;font-size:12px}
+.btn-block{width:100%;margin-top:20px;padding:14px}
+
+.alert{padding:12px 14px;border-radius:10px;font-size:13px;margin-top:14px;line-height:1.5;display:flex;align-items:flex-start;gap:8px}
+.alert.info{background:rgba(255,255,255,0.04);border:1px solid var(--border2);color:var(--muted)}
+.alert.ok{background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.3);color:var(--success)}
+.alert.err{background:rgba(255,61,113,0.08);border:1px solid rgba(255,61,113,0.3);color:var(--danger)}
+.alert.warn{background:rgba(255,171,0,0.08);border:1px solid rgba(255,171,0,0.3);color:var(--warning)}
+
+.bi-box{padding:16px 18px;border-radius:14px;margin-top:14px;font-size:13px;line-height:1.6;font-weight:500;display:none;animation:slideIn .35s ease}
+.bi-box.show{display:block}
+.bi-box .bi-header{font-size:10px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;opacity:.7;font-weight:700}
+.bi-box.safe{background:rgba(0,230,118,0.09);border:1px solid rgba(0,230,118,0.35);color:var(--success)}
+.bi-box.caution{background:rgba(255,171,0,0.09);border:1px solid rgba(255,171,0,0.35);color:var(--warning)}
+.bi-box.danger{background:rgba(255,61,113,0.09);border:1px solid rgba(255,61,113,0.35);color:var(--danger)}
+.bi-box.blocked{background:rgba(255,23,68,0.14);border:2px solid rgba(255,23,68,0.55);color:var(--critical);animation:slideIn .35s ease,bpulse 2s infinite}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,23,68,0.3)}50%{box-shadow:0 0 0 8px rgba(255,23,68,0)}}
+
+.predict-box{padding:14px 16px;border-radius:12px;margin-top:12px;font-size:13px;display:none;border:1px solid var(--border2);background:rgba(255,255,255,0.03)}
+.predict-box.show{display:block}
+.predict-box.will-approve{border-color:rgba(0,230,118,0.4);background:rgba(0,230,118,0.06)}
+.predict-box.will-block{border-color:rgba(255,23,68,0.45);background:rgba(255,23,68,0.08)}
+.predict-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:12px}
+.predict-row .pl{color:var(--muted)}
+.predict-row .pv{font-weight:700;font-variant-numeric:tabular-nums}
+
+.header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid var(--border);background:rgba(4,4,8,0.9);backdrop-filter:blur(24px);position:sticky;top:0;z-index:100}
+
+.nav-bar{display:flex;gap:4px;flex-wrap:wrap;margin:24px 0 20px;padding:4px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:14px;width:fit-content}
+.nav-tab{padding:8px 16px;border-radius:11px;cursor:pointer;font-weight:600;font-size:13px;color:var(--muted);transition:all .2s;letter-spacing:0.02em}
+.nav-tab:hover{color:var(--text);background:rgba(255,255,255,0.05)}
+.nav-tab.active{color:#fff;background:linear-gradient(135deg,var(--primary),var(--accent));box-shadow:0 4px 16px var(--glow-p)}
+@media(max-width:700px){.nav-bar{width:100%}.nav-tab{flex:1;text-align:center;font-size:11px;padding:8px 8px}}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+@media(max-width:780px){.grid-2{grid-template-columns:1fr}.grid-3{grid-template-columns:1fr 1fr}}
+@media(max-width:480px){.grid-3{grid-template-columns:1fr}}
+
+.card{padding:24px}
+.card-title{font-size:17px;margin-bottom:3px}
+.card-sub{color:var(--muted);font-size:12px;margin-bottom:18px;font-weight:400}
+
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+@media(max-width:780px){.stat-grid{grid-template-columns:1fr 1fr}}
+.sc{padding:20px}
+.sc-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;font-weight:600}
+.sc-value{font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:0.03em;line-height:1}
+.sc-sub{font-size:11px;color:var(--muted);margin-top:6px}
+
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+.badge{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:99px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.badge.ok{background:rgba(0,230,118,0.12);color:var(--success);border:1px solid rgba(0,230,118,0.3)}
+.badge.medium{background:rgba(255,171,0,0.12);color:var(--warning);border:1px solid rgba(255,171,0,0.3)}
+.badge.high{background:rgba(255,100,0,0.12);color:#ff6400;border:1px solid rgba(255,100,0,0.3)}
+.badge.bad{background:rgba(255,61,113,0.12);color:var(--danger);border:1px solid rgba(255,61,113,0.3)}
+.badge.critical{background:rgba(255,23,68,0.15);color:var(--critical);border:1px solid rgba(255,23,68,0.4);animation:bpulse 1s infinite}
+.badge.ai{background:rgba(0,212,255,0.12);color:var(--accent);border:1px solid rgba(0,212,255,0.3)}
+
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-radius:10px;background:rgba(255,255,255,0.025);border:1px solid var(--border);margin-bottom:8px}
+.stat-row .lbl{font-size:13px;color:var(--muted)}
+.stat-row .val{font-weight:700;font-size:14px;font-variant-numeric:tabular-nums}
+
+.progress{height:6px;border-radius:99px;background:rgba(255,255,255,0.06);overflow:hidden;margin-top:6px}
+.progress>div{height:100%;border-radius:99px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+.log-list{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:7px}
+.log-list::-webkit-scrollbar{width:3px}
+.log-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
+.log-item{padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,0.02)}
+.log-item.bad{background:rgba(255,61,113,0.06);border-color:rgba(255,61,113,0.25)}
+.log-item.ok{background:rgba(0,230,118,0.05);border-color:rgba(0,230,118,0.2)}
+.log-item.warn{background:rgba(255,171,0,0.06);border-color:rgba(255,171,0,0.25)}
+.log-item .li-title{font-weight:600;font-size:13px}
+.log-item .li-meta{font-size:11px;color:var(--muted);margin-top:4px}
+
+.pipeline{display:flex;align-items:center;gap:0;overflow-x:auto;padding:16px 0;margin-bottom:4px;scrollbar-width:none}
+.pipeline::-webkit-scrollbar{display:none}
+.pipe-step{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:90px;flex:1}
+.pipe-icon{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:22px;background:rgba(255,255,255,0.04);border:1px solid var(--border2);position:relative;transition:all .4s}
+.pipe-icon.active{background:rgba(108,71,255,0.15);border-color:var(--primary);box-shadow:0 0 20px var(--glow-p)}
+.pipe-icon.ok{background:rgba(0,230,118,0.1);border-color:rgba(0,230,118,0.4)}
+.pipe-icon.bad{background:rgba(255,61,113,0.1);border-color:rgba(255,61,113,0.4);animation:bpulse 1.5s infinite}
+.pipe-icon.warn{background:rgba(255,171,0,0.1);border-color:rgba(255,171,0,0.4)}
+.pipe-label{font-size:10px;color:var(--muted);font-weight:600;text-align:center;letter-spacing:.04em;text-transform:uppercase}
+.pipe-arrow{font-size:18px;color:var(--muted2);flex-shrink:0;margin:0 2px;padding-bottom:18px}
+
+.meter-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0}
+#meterSvg{overflow:visible}
+.zone-badge{padding:5px 22px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;transition:all .4s}
+
+.donut-wrap{position:relative;width:150px;height:150px;margin:4px auto 16px}
+.donut-wrap svg{transform:rotate(-90deg)}
+.donut-center{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.donut-num{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:.03em}
+.donut-lbl{font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-top:2px}
+
+#map{width:100%;height:420px;border-radius:12px;border:1px solid var(--border2);overflow:hidden}
+
+/* ── OCR UPLOAD ZONE ── */
+.upload-zone{border:2px dashed var(--border2);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:all .2s;display:block}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--primary);background:rgba(108,71,255,0.05)}
+.upload-icon{font-size:32px;margin-bottom:8px}
+.upload-hint{color:var(--muted);font-size:13px}
+.upload-ext{color:var(--muted2);font-size:11px;margin-top:4px}
+
+/* ── SCAN PROGRESS BAR ── */
+.scan-bar{height:3px;border-radius:99px;background:rgba(255,255,255,0.05);overflow:hidden;margin-top:12px}
+.scan-fill{height:100%;width:30%;background:linear-gradient(90deg,transparent,var(--accent),transparent);display:none}
+.scanning .scan-fill{display:block;animation:scan 1.1s infinite}
+@keyframes scan{0%{transform:translateX(-200%)}100%{transform:translateX(500%)}}
+
+/* ── OCR RESULT PANEL ── */
+.ocr-result-panel{display:none;margin-top:16px;border-radius:14px;overflow:hidden;border:1px solid var(--border2);animation:slideIn .4s ease}
+.ocr-result-panel.show{display:block}
+.ocr-result-panel.alcohol{border-color:rgba(255,171,0,0.5)}
+.ocr-result-panel.clean{border-color:rgba(0,230,118,0.4)}
+
+.ocr-result-header{padding:16px 18px;display:flex;align-items:center;gap:12px}
+.ocr-result-header.alcohol{background:rgba(255,171,0,0.1)}
+.ocr-result-header.clean{background:rgba(0,230,118,0.08)}
+.ocr-result-icon{font-size:28px;flex-shrink:0}
+.ocr-result-title{font-size:16px;font-weight:700}
+.ocr-result-sub{font-size:12px;color:var(--muted);margin-top:2px}
+
+.ocr-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--border)}
+.ocr-detail-cell{padding:12px 16px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+.ocr-detail-cell:nth-child(even){border-right:none}
+.ocr-detail-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:4px}
+.ocr-detail-value{font-size:13px;font-weight:600}
+
+.ocr-items-section{padding:12px 16px;border-top:1px solid var(--border)}
+.ocr-items-title{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:8px}
+.ocr-item-pill{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:11px;font-weight:600;margin:2px;background:rgba(255,171,0,0.1);border:1px solid rgba(255,171,0,0.3);color:var(--warning)}
+.ocr-item-pill.clean{background:rgba(255,255,255,0.04);border-color:var(--border2);color:var(--muted)}
+
+.ocr-summary-section{padding:12px 16px;border-top:1px solid var(--border);background:rgba(255,255,255,0.02)}
+.ocr-summary-text{font-size:12px;color:var(--muted);line-height:1.6}
+
+.ocr-text-preview{background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);white-space:pre-wrap;max-height:120px;overflow-y:auto;margin-top:8px;line-height:1.6}
+
+.ocr-preview-img{max-width:100%;border-radius:8px;margin-top:10px;display:none;max-height:200px;object-fit:contain;border:1px solid var(--border2)}
+
+/* ── AUTO-LOG BADGE ── */
+.auto-log-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:99px;font-size:11px;font-weight:700;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:var(--accent);margin-top:8px}
+
+/* ── AI PROCESSING STATE ── */
+.ai-processing{display:none;padding:20px;text-align:center;border:1px solid var(--border2);border-radius:12px;margin-top:12px;background:rgba(108,71,255,0.05)}
+.ai-processing.show{display:block}
+.ai-spinner{width:36px;height:36px;border-radius:50%;border:3px solid var(--border2);border-top-color:var(--primary);animation:spin .8s linear infinite;margin:0 auto 10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai-processing-text{font-size:13px;color:var(--muted);font-weight:500}
+.ai-processing-sub{font-size:11px;color:var(--muted2);margin-top:4px}
+
+.user-chip{display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:99px;background:rgba(255,255,255,0.05);border:1px solid var(--border2);font-size:13px;color:var(--muted)}
+.user-avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff}
+
+#toast{position:fixed;bottom:24px;right:24px;padding:14px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s cubic-bezier(.4,0,.2,1);max-width:320px;backdrop-filter:blur(16px)}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.ok{background:rgba(0,230,118,0.2);border:1px solid rgba(0,230,118,0.4);color:var(--success)}
+#toast.err{background:rgba(255,61,113,0.2);border:1px solid rgba(255,61,113,0.4);color:var(--danger)}
+#toast.info{background:rgba(108,71,255,0.2);border:1px solid rgba(108,71,255,0.4);color:var(--text)}
+#toast.warn{background:rgba(255,171,0,0.2);border:1px solid rgba(255,171,0,0.4);color:var(--warning)}
+
+#gpsBanner{display:none;padding:12px 16px;border-radius:10px;margin-bottom:14px;font-weight:600;font-size:13px}
+
+.payment-gate{padding:20px;border-radius:14px;margin-top:16px;display:none;text-align:center;animation:slideIn .4s ease}
+.payment-gate.show{display:block}
+.payment-gate.approved{background:rgba(0,230,118,0.08);border:2px solid rgba(0,230,118,0.4)}
+.payment-gate.blocked{background:rgba(255,23,68,0.1);border:2px solid rgba(255,23,68,0.5);animation:slideIn .4s ease,bpulse 2s infinite}
+.pg-icon{font-size:40px;margin-bottom:8px}
+.pg-title{font-size:18px;font-weight:700;margin-bottom:4px}
+.pg-detail{font-size:13px;color:var(--muted);margin-bottom:12px}
+
+.hidden{display:none!important}
+.empty{text-align:center;padding:28px 16px;color:var(--muted2)}
+.empty .eicon{font-size:32px;margin-bottom:8px;opacity:.4}
+.empty p{font-size:13px}
+
+.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
+
+.leaflet-container{background:#090912!important}
+.leaflet-popup-content-wrapper{background:#10101c;color:var(--text);border:1px solid var(--border2);border-radius:10px;font-family:'Space Grotesk',sans-serif;font-size:13px}
+.leaflet-popup-tip{background:#10101c}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+section[data-view]:not(.hidden){animation:fadeIn .25s ease-out}
+
+.step-indicator{display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.step{padding:5px 14px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.step.done{background:rgba(0,230,118,0.12);color:var(--success);border:1px solid rgba(0,230,118,0.3)}
+.step.active{background:rgba(108,71,255,0.15);color:var(--primary2);border:1px solid var(--primary)}
+.step.pending{background:rgba(255,255,255,0.03);color:var(--muted2);border:1px solid var(--border)}
+.step-arrow{color:var(--muted2);font-size:14px}
+
+.mini-bars{display:flex;align-items:flex-end;gap:4px;height:60px;margin-top:8px}
+.mini-bar{flex:1;border-radius:3px 3px 0 0;min-width:8px;transition:height .5s ease;position:relative}
+
+.impact-chart{background:rgba(255,255,255,0.025);border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:12px}
+.ic-title{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:12px}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bar-row .bl{font-size:11px;color:var(--muted);width:80px;flex-shrink:0}
+.bar-row .bt{flex:1;height:14px;border-radius:4px;background:rgba(255,255,255,0.04);overflow:hidden}
+.bar-row .bf{height:100%;border-radius:4px;transition:width .8s ease}
+.bar-row .bv{font-size:11px;font-weight:700;width:36px;text-align:right;flex-shrink:0}
+
+.tracking-pulse{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--success);font-weight:600}
+.tracking-dot{width:7px;height:7px;border-radius:50%;background:var(--success);animation:tdot 1.5s ease-in-out infinite}
+@keyframes tdot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+
+.module-label{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:rgba(108,71,255,0.1);color:var(--primary2);border:1px solid rgba(108,71,255,0.2);margin-bottom:8px}
+
+.risk-legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div class="ambient">
+  <div class="ambient-blob"></div>
+  <div class="ambient-blob"></div>
+  <div class="ambient-blob"></div>
+</div>
+<div id="toast"></div>
+
+<!-- ════════════ AUTH ════════════ -->
+<div id="authView" class="auth-wrap">
+  <div class="glass auth-card">
+    <div class="brand">
+      <div class="brand-icon">A</div>
+      <div>
+        <div class="brand-name">AlcoShield</div>
+        <div class="brand-sub">Smart Alcohol Control System</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <div class="pipeline">
+        <div class="pipe-step"><div class="pipe-icon">👤</div><div class="pipe-label">Register</div></div>
+        <div class="pipe-arrow">›</div>
+        <div class="pipe-step"><div class="pipe-icon active">🛡️</div><div class="pipe-label">Age Gate &gt;21</div></div>
+        <div class="pipe-arrow">›</div>
+        <div class="pipe-step"><div class="pipe-icon">📊</div><div class="pipe-label">Set Limits</div></div>
+        <div class="pipe-arrow">›</div>
+        <div class="pipe-step"><div class="pipe-icon">🔒</div><div class="pipe-label">Payment</div></div>
+        <div class="pipe-arrow">›</div>
+        <div class="pipe-step"><div class="pipe-icon">🔔</div><div class="pipe-label">BIM Alert</div></div>
+      </div>
+    </div>
+
+    <div class="tab-row">
+      <div class="tab-btn active" data-tab="login" onclick="switchAuthTab('login')">Sign In</div>
+      <div class="tab-btn" data-tab="register" onclick="switchAuthTab('register')">Register</div>
+    </div>
+
+    <div id="loginForm">
+      <label>Email</label>
+      <input id="loginEmail" type="email" placeholder="you@example.com" autocomplete="email"/>
+      <label>Password</label>
+      <input id="loginPassword" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <button class="btn btn-primary btn-block" onclick="doLogin()" id="loginBtn">Sign In →</button>
+    </div>
+
+    <div id="registerForm" class="hidden">
+      <div class="step-indicator" style="margin-bottom:12px">
+        <div class="step active">Step 1: Details</div>
+        <div class="step-arrow">→</div>
+        <div class="step pending">Age Verify</div>
+        <div class="step-arrow">→</div>
+        <div class="step pending">Initialize Tracking</div>
+      </div>
+      <label>Full Name</label>
+      <input id="regName" placeholder="Your full name"/>
+      <label>Email</label>
+      <input id="regEmail" type="email" placeholder="you@example.com"/>
+      <label>Password</label>
+      <input id="regPassword" type="password" placeholder="Min 6 characters"/>
+      <div class="row" style="margin-top:0;gap:12px">
+        <div style="flex:1">
+          <label>Gender</label>
+          <select id="regGender">
+            <option value="male">Male (14 units/wk)</option>
+            <option value="female">Female (10 units/wk)</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <label>Age (must be &gt;21)</label>
+          <input id="regAge" type="number" min="18" max="100" value="25"/>
+        </div>
+      </div>
+      <div class="alert info" style="margin-top:12px;font-size:11px">🛡️ Flowchart: Verify Legality (age &gt; 21) → YES → Initialize Consumption Tracking + Set Predefined Weekly Limits (NIAAA).</div>
+      <button class="btn btn-primary btn-block" onclick="doRegister()" id="registerBtn">Verify Age &amp; Create Account →</button>
+    </div>
+
+    <div id="authMsg" class="alert info">ℹ️ Welcome — sign in or create an account to continue.</div>
+  </div>
+</div>
+
+<!-- ════════════ APP ════════════ -->
+<div id="appView" class="hidden">
+  <div class="header">
+    <div class="brand" style="margin:0">
+      <div class="brand-icon" style="width:36px;height:36px;font-size:20px">A</div>
+      <div class="brand-name" style="font-size:24px">AlcoShield</div>
+    </div>
+    <div class="row">
+      <div class="tracking-pulse"><div class="tracking-dot"></div>Continuous Tracking Active</div>
+      <div class="user-chip">
+        <div class="user-avatar" id="userAvatar">?</div>
+        <span id="userChip">User</span>
+      </div>
+      <button class="btn btn-sm btn-danger" onclick="confirmReset()">⚠ Reset Data</button>
+      <button class="btn btn-sm btn-ghost" onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="nav-bar">
+      <div class="nav-tab active" data-view="overview"    onclick="show('overview')">Overview</div>
+      <div class="nav-tab"        data-view="transaction" onclick="show('transaction')">Payment Gate</div>
+      <div class="nav-tab"        data-view="sms"         onclick="show('sms')">SMS Monitor</div>
+      <div class="nav-tab"        data-view="ocr"         onclick="show('ocr')">OCR Bills</div>
+      <div class="nav-tab"        data-view="gps"         onclick="show('gps')">GPS Map</div>
+      <div class="nav-tab"        data-view="insights"    onclick="show('insights')">Insights</div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <section data-view="overview">
+      <div class="glass card" style="margin-bottom:18px">
+        <h3 class="card-title">System Pipeline — Flowchart Overview</h3>
+        <p class="card-sub">Smart Alcohol Control System — complete data flow matching methodology diagram</p>
+        <div class="pipeline">
+          <div class="pipe-step"><div class="pipe-icon ok" id="pipeUser">👤</div><div class="pipe-label">User</div></div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step"><div class="pipe-icon ok" id="pipeAge">🛡️</div><div class="pipe-label">Age Gate</div></div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step"><div class="pipe-icon ok" id="pipeInit">📋</div><div class="pipe-label">Init Tracking &amp; Set Limits</div></div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step"><div class="pipe-icon active" id="pipeTrack">📊</div><div class="pipe-label">Continuous Tracking</div></div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step"><div class="pipe-icon" id="pipeThresh">⚖️</div><div class="pipe-label">Check Threshold</div></div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step"><div class="pipe-icon" id="pipeBIM">🔔</div><div class="pipe-label">BIM Notifications</div></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <span style="font-size:11px;color:var(--muted)">Input modules:</span>
+          <span class="badge ok"     style="font-size:10px">💳 Transaction Control</span>
+          <span class="badge medium" style="font-size:10px">📱 SMS Monitoring</span>
+          <span class="badge ai"     style="font-size:10px">🧾 OCR AI Vision</span>
+          <span class="badge bad"    style="font-size:10px">📍 GPS Proximity</span>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="glass sc"><div class="sc-label">Weekly Limit</div><div class="sc-value" id="sc-limit" style="color:var(--accent)">—</div><div class="sc-sub">units (NIAAA)</div></div>
+        <div class="glass sc"><div class="sc-label">Consumed</div><div class="sc-value" id="sc-consumed" style="color:var(--primary2)">—</div><div class="sc-sub">all sources</div></div>
+        <div class="glass sc"><div class="sc-label">Remaining</div><div class="sc-value" id="sc-remaining" style="color:var(--success)">—</div><div class="sc-sub">units left</div></div>
+        <div class="glass sc"><div class="sc-label">Risk Level</div><div id="sc-risk" class="badge ok" style="font-size:13px;margin-top:6px">Low</div><div class="sc-sub" id="sc-pct" style="margin-top:8px">0% used</div></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="glass card" style="text-align:center">
+          <div class="module-label">📊 Continuous Consumption Tracking</div>
+          <h3 class="card-title">Live Consumption Meter</h3>
+          <p class="card-sub">Dynamic update — refreshes from all modules</p>
+          <div class="meter-wrap">
+            <svg id="meterSvg" width="220" height="130" viewBox="0 0 220 130" overflow="visible">
+              <path id="mBg"   fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="14" stroke-linecap="round"/>
+              <path id="mSeg1" fill="none" stroke="#00e676" stroke-width="14" stroke-linecap="butt" opacity=".25"/>
+              <path id="mSeg2" fill="none" stroke="#ffab00" stroke-width="14" stroke-linecap="butt" opacity=".25"/>
+              <path id="mSeg3" fill="none" stroke="#ff3d71" stroke-width="14" stroke-linecap="butt" opacity=".25"/>
+              <path id="mFill" fill="none" stroke-width="14" stroke-linecap="round"/>
+              <g id="mTicks"></g>
+              <text x="16"  y="126" font-size="9" fill="var(--muted)" font-family="Space Grotesk,sans-serif" font-weight="600">SAFE</text>
+              <text x="110" y="14"  font-size="9" fill="var(--muted)" font-family="Space Grotesk,sans-serif" font-weight="600" text-anchor="middle">LIMIT</text>
+              <text x="204" y="126" font-size="9" fill="var(--muted)" font-family="Space Grotesk,sans-serif" font-weight="600" text-anchor="end">OVER</text>
+              <g id="mNeedle">
+                <line x1="110" y1="118" x2="110" y2="40" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity=".9"/>
+                <line x1="110" y1="118" x2="110" y2="128" stroke="white" stroke-width="2" stroke-linecap="round" opacity=".4"/>
+              </g>
+              <circle cx="110" cy="118" r="8" fill="var(--text)"/>
+              <circle cx="110" cy="118" r="4" fill="var(--bg)"/>
+              <text id="mPct" x="110" y="98"  font-size="28" font-weight="700" font-family="Bebas Neue,sans-serif" fill="var(--success)" text-anchor="middle" dominant-baseline="middle" letter-spacing="1">0%</text>
+              <text id="mSub" x="110" y="116" font-size="9.5" fill="var(--muted)" font-family="Space Grotesk,sans-serif" text-anchor="middle">0 / 0 units</text>
+            </svg>
+            <div class="zone-badge" id="mZone" style="background:rgba(0,230,118,0.12);color:var(--success);border:1px solid rgba(0,230,118,0.3)">✓ Safe Zone</div>
+          </div>
+        </div>
+
+        <div class="glass card">
+          <div class="module-label">📋 Activity Summary</div>
+          <h3 class="card-title">All-Module Monitoring</h3>
+          <p class="card-sub">Aggregated from Transaction + SMS + OCR AI + GPS modules</p>
+          <div class="stat-row"><span class="lbl">✅ Approved payments</span><span class="val" id="ovTxn">0</span></div>
+          <div class="stat-row"><span class="lbl">🚫 Blocked payments</span><span class="val" style="color:var(--danger)" id="ovBlocked">0</span></div>
+          <div class="stat-row"><span class="lbl">📱 External SMS flags</span><span class="val" style="color:var(--warning)" id="ovSms">0</span></div>
+          <div class="stat-row"><span class="lbl">🧾 OCR alcohol bills</span><span class="val" style="color:var(--warning)" id="ovOcr">0</span></div>
+          <div style="margin-top:16px">
+            <div class="progress"><div id="ovProgress" style="width:0%;background:linear-gradient(90deg,var(--success),var(--warning),var(--danger))"></div></div>
+            <p style="font-size:11px;color:var(--muted);margin-top:6px" id="ovProgressLabel">0 / 0 units consumed</p>
+          </div>
+          <div class="impact-chart" style="margin-top:16px">
+            <div class="ic-title">Blocked vs Allowed Impact</div>
+            <div class="bar-row"><span class="bl">Approved</span><div class="bt"><div class="bf" id="impApprBar" style="background:var(--success);width:0%"></div></div><span class="bv" id="impApprVal" style="color:var(--success)">0%</span></div>
+            <div class="bar-row"><span class="bl">Blocked</span><div class="bt"><div class="bf" id="impBlockBar" style="background:var(--danger);width:0%"></div></div><span class="bv" id="impBlockVal" style="color:var(--danger)">0%</span></div>
+            <div class="bar-row"><span class="bl">SMS Flags</span><div class="bt"><div class="bf" id="impSmsBar" style="background:var(--warning);width:0%"></div></div><span class="bv" id="impSmsVal" style="color:var(--warning)">0</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass card" style="margin-top:18px">
+        <div class="module-label">🔔 Behavioral Intervention Module (BIM)</div>
+        <h3 class="card-title">Context-Aware Notification</h3>
+        <p class="card-sub">Real-time behavioral nudge from Continuous Consumption Tracking → Check Weekly Threshold → BIM</p>
+        <div id="overviewBIM" class="bi-box">
+          <div class="bi-header">BIM — Continuous Tracking</div>
+          <span id="overviewBIMMsg">Loading…</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAYMENT GATE -->
+    <section data-view="transaction" class="hidden">
+      <div class="step-indicator">
+        <div class="step done">✓ Age Verified</div><div class="step-arrow">→</div>
+        <div class="step done">✓ Limits Set</div><div class="step-arrow">→</div>
+        <div class="step active">⚡ Evaluate Transaction</div><div class="step-arrow">→</div>
+        <div class="step pending">Predict New Total</div><div class="step-arrow">→</div>
+        <div class="step pending">Threshold Check</div><div class="step-arrow">→</div>
+        <div class="step pending">BIM Alert</div>
+      </div>
+      <div class="grid-2">
+        <div class="glass card">
+          <div class="module-label">💳 Transaction Control Module</div>
+          <h3 class="card-title">UPI Payment Authorization</h3>
+          <p class="card-sub">Evaluate → Predict New Total → Exceeds Threshold? → Restrict or Approve → Update Tracking → BIM</p>
+          <label>Vendor / Store Name</label>
+          <input id="txnVendor" placeholder="e.g. The Spirits Lounge, Beer Garden MG Road" oninput="clearPredict()"/>
+          <div class="row" style="gap:12px;margin-top:0">
+            <div style="flex:1"><label>Alcohol Units</label><input id="txnUnits" type="number" min="0.5" step="0.5" placeholder="e.g. 2.5" oninput="onUnitsInput()"/></div>
+            <div style="flex:1"><label>Amount (₹)</label><input id="txnAmount" type="number" min="0" placeholder="e.g. 850"/></div>
+          </div>
+          <p style="font-size:11px;color:var(--muted);margin-top:6px">1 unit ≈ 1 standard drink · ₹200 ≈ 1 unit (heuristic)</p>
+
+          <div id="predictBox" class="predict-box">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin-bottom:8px">📊 Predict New Total (Pre-Auth Check)</div>
+            <div class="predict-row"><span class="pl">Current</span><span class="pv" id="predCurrent">—</span></div>
+            <div class="predict-row"><span class="pl">Adding</span><span class="pv" id="predAdding">—</span></div>
+            <div class="predict-row"><span class="pl">Predicted total</span><span class="pv" id="predTotal">—</span></div>
+            <div class="predict-row"><span class="pl">Weekly limit</span><span class="pv" id="predLimit">—</span></div>
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:11px;color:var(--muted)">Decision:</span>
+              <span class="badge" id="predDecision">—</span>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:16px">
+            <button class="btn btn-primary" onclick="submitTxn()" id="txnBtn">⚡ Authorize Payment</button>
+            <button class="btn btn-ghost" onclick="clearTxn()">Clear</button>
+          </div>
+
+          <div id="payGate" class="payment-gate">
+            <div class="pg-icon" id="pgIcon">⏳</div>
+            <div class="pg-title" id="pgTitle">Processing…</div>
+            <div class="pg-detail" id="pgDetail"></div>
+            <div class="badge" id="pgBadge" style="margin:0 auto">—</div>
+          </div>
+
+          <div id="txnBIM" class="bi-box" style="margin-top:14px">
+            <div class="bi-header">🔔 BIM — Transaction Control</div>
+            <span id="txnBIMMsg"></span>
+          </div>
+          <div id="txnMsg" class="alert info">ℹ️ Enter vendor, units, and amount. Payment is BLOCKED if your weekly limit would be exceeded.</div>
+        </div>
+
+        <div class="glass card">
+          <h3 class="card-title">Transaction History</h3>
+          <p class="card-sub">Last 50 payment gate decisions</p>
+          <div id="txnList" class="log-list"><div class="empty"><div class="eicon">📋</div><p>No transactions yet</p></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SMS MONITOR -->
+    <section data-view="sms" class="hidden">
+      <div class="step-indicator">
+        <div class="step done">✓ UPI SMS Received</div><div class="step-arrow">→</div>
+        <div class="step active">⚡ Extract UPI Details</div><div class="step-arrow">→</div>
+        <div class="step pending">Alcohol Detection</div><div class="step-arrow">→</div>
+        <div class="step pending">Update Tracking</div><div class="step-arrow">→</div>
+        <div class="step pending">BIM Alert</div>
+      </div>
+      <div class="grid-2">
+        <div class="glass card">
+          <div class="module-label">📱 SMS-Based Monitoring</div>
+          <h3 class="card-title">External UPI SMS Monitor</h3>
+          <p class="card-sub">Extract external UPI details → Detect alcohol keywords → Update Continuous Consumption Tracking → BIM</p>
+          <label>SMS Text</label>
+          <textarea id="smsText" rows="4" placeholder="Paste a bank/UPI SMS message here…&#10;&#10;e.g. You have made a payment of Rs. 850 at THE LIQUOR BARN via UPI."></textarea>
+          <div class="row" style="gap:12px;margin-top:0">
+            <div style="flex:1"><label>Sender</label><input id="smsSender" placeholder="e.g. HDFC-BANK"/></div>
+            <div style="flex:1"><label>Amount (₹)</label><input id="smsAmount" type="number" placeholder="850"/></div>
+          </div>
+          <div class="row" style="margin-top:16px">
+            <button class="btn btn-primary" onclick="scanSms()">🔍 Scan &amp; Extract</button>
+            <button class="btn btn-ghost" onclick="loadSampleSms()">Load Sample</button>
+          </div>
+          <div id="smsMsg" class="alert info">ℹ️ Paste a UPI/bank message. Alcohol keywords trigger unit estimation and update Consumption Tracking.</div>
+          <div id="smsBIM" class="bi-box">
+            <div class="bi-header">🔔 BIM — SMS Monitoring</div>
+            <span id="smsBIMMsg"></span>
+          </div>
+        </div>
+        <div class="glass card">
+          <h3 class="card-title">SMS Scan History</h3>
+          <p class="card-sub">Extracted UPI details + estimated units + BIM triggers</p>
+          <div id="smsList" class="log-list"><div class="empty"><div class="eicon">📱</div><p>No SMS scanned yet</p></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════
+         OCR BILLS — CLAUDE VISION AI
+    ════════════════════════════════════════════════════ -->
+    <section data-view="ocr" class="hidden">
+      <div class="step-indicator">
+        <div class="step done">✓ Receipt Uploaded</div><div class="step-arrow">→</div>
+        <div class="step active">⚡ Claude Vision AI Analysis</div><div class="step-arrow">→</div>
+        <div class="step pending">Alcohol Detection</div><div class="step-arrow">→</div>
+        <div class="step pending">Auto-Estimate Units</div><div class="step-arrow">→</div>
+        <div class="step pending">Update Tracking</div><div class="step-arrow">→</div>
+        <div class="step pending">BIM Alert</div>
+      </div>
+
+      <div class="grid-2">
+        <!-- LEFT: Upload + AI Analysis -->
+        <div class="glass card">
+          <div class="module-label">🧾 OCR — Claude Vision AI</div>
+          <h3 class="card-title">AI-Powered Receipt Analyzer</h3>
+          <p class="card-sub">
+            Upload a receipt → Claude Vision reads every item → detects alcohol → extracts total amount →
+            auto-estimates units → updates Consumption Tracking → BIM notification
+          </p>
+
+          <!-- Drop zone -->
+          <label for="ocrFile" class="upload-zone" id="ocrDropZone">
+            <div class="upload-icon">🧾</div>
+            <p class="upload-hint">Click or drag &amp; drop a receipt image</p>
+            <p class="upload-ext">PNG · JPG · JPEG accepted · AI analysis runs server-side</p>
+          </label>
+          <input id="ocrFile" type="file" accept="image/*" style="display:none" onchange="uploadOcr(event)"/>
+
+          <!-- Scan progress bar -->
+          <div class="scan-bar" id="ocrScanBar"><div class="scan-fill"></div></div>
+
+          <!-- Image preview -->
+          <img id="ocrPreview" class="ocr-preview-img" alt="Receipt preview"/>
+
+          <!-- AI Processing spinner -->
+          <div id="ocrProcessing" class="ai-processing">
+            <div class="ai-spinner"></div>
+            <div class="ai-processing-text">🤖 Claude Vision AI is analyzing your receipt…</div>
+            <div class="ai-processing-sub">Extracting items, detecting alcohol, reading totals</div>
+          </div>
+
+          <!-- ── AI RESULT PANEL ── -->
+          <div id="ocrResultPanel" class="ocr-result-panel">
+            <!-- Header -->
+            <div id="ocrResultHeader" class="ocr-result-header">
+              <div class="ocr-result-icon" id="ocrResultIcon">🧾</div>
+              <div>
+                <div class="ocr-result-title" id="ocrResultTitle">Analyzing…</div>
+                <div class="ocr-result-sub" id="ocrResultSub"></div>
+              </div>
+              <span class="badge ai" id="ocrMethodBadge" style="margin-left:auto;flex-shrink:0">AI</span>
+            </div>
+
+            <!-- Detail grid: Vendor, Date, Amount, Units -->
+            <div class="ocr-detail-grid">
+              <div class="ocr-detail-cell">
+                <div class="ocr-detail-label">Vendor</div>
+                <div class="ocr-detail-value" id="ocrVendorVal">—</div>
+              </div>
+              <div class="ocr-detail-cell">
+                <div class="ocr-detail-label">Bill Date</div>
+                <div class="ocr-detail-value" id="ocrDateVal">—</div>
+              </div>
+              <div class="ocr-detail-cell">
+                <div class="ocr-detail-label">Total Amount</div>
+                <div class="ocr-detail-value" id="ocrAmountVal" style="color:var(--accent)">—</div>
+              </div>
+              <div class="ocr-detail-cell">
+                <div class="ocr-detail-label">Est. Units</div>
+                <div class="ocr-detail-value" id="ocrUnitsVal" style="color:var(--warning)">—</div>
+              </div>
+            </div>
+
+            <!-- Alcohol items detected -->
+            <div class="ocr-items-section" id="ocrAlcoholSection">
+              <div class="ocr-items-title">🍷 Alcohol Items Detected</div>
+              <div id="ocrAlcoholItems"></div>
+            </div>
+
+            <!-- All bill items -->
+            <div class="ocr-items-section" id="ocrAllItemsSection" style="display:none">
+              <div class="ocr-items-title">📋 All Bill Items</div>
+              <div id="ocrAllItems"></div>
+              <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="toggleAllItems()">Hide Items</button>
+            </div>
+            <div id="ocrShowAllBtn" style="padding:8px 16px;border-top:1px solid var(--border);display:none">
+              <button class="btn btn-ghost btn-sm" onclick="toggleAllItems()">📋 Show All Bill Items</button>
+            </div>
+
+            <!-- Auto-log status -->
+            <div id="ocrAutoLog" style="padding:10px 16px;border-top:1px solid var(--border);display:none">
+              <div class="auto-log-badge" id="ocrAutoLogBadge">✅ Units auto-logged to tracking</div>
+            </div>
+
+            <!-- AI Summary -->
+            <div class="ocr-summary-section">
+              <div class="ocr-items-title">🤖 AI Analysis Summary</div>
+              <div class="ocr-summary-text" id="ocrSummaryText">—</div>
+            </div>
+
+            <!-- OCR Text Preview (collapsible) -->
+            <div style="padding:0 16px 12px" id="ocrTextSection" style="display:none">
+              <div style="margin-top:8px">
+                <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="toggleOcrText()">📄 Toggle Extracted Text</button>
+                <div id="ocrTextPreviewWrap" style="display:none">
+                  <div class="ocr-text-preview" id="ocrTextPreview"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Confidence / AI error note -->
+          <div id="ocrAiNote" style="display:none;margin-top:8px;font-size:11px;color:var(--muted)"></div>
+
+          <!-- BIM output -->
+          <div id="ocrBIM" class="bi-box" style="margin-top:14px">
+            <div class="bi-header">🔔 BIM — OCR AI Verification</div>
+            <span id="ocrBIMMsg"></span>
+          </div>
+
+          <!-- Manual log CTA (shown when alcohol detected but no auto-log) -->
+          <div id="ocrManualLogCTA" style="display:none;margin-top:12px;padding:12px 14px;border-radius:10px;background:rgba(255,171,0,0.06);border:1px solid rgba(255,171,0,0.3)">
+            <p style="font-size:12px;color:var(--warning);margin-bottom:10px">
+              ⚠️ Alcohol detected but units couldn't be auto-estimated (no amount found or low confidence).
+              Log manually in Payment Gate to update your tracking.
+            </p>
+            <button class="btn btn-warn btn-sm" onclick="show('transaction')">→ Go to Payment Gate</button>
+          </div>
+        </div>
+
+        <!-- RIGHT: History -->
+        <div class="glass card">
+          <h3 class="card-title">OCR Classification History</h3>
+          <p class="card-sub">AI-analyzed receipts — alcohol vs non-alcohol</p>
+          <div id="ocrList" class="log-list"><div class="empty"><div class="eicon">📄</div><p>No bills uploaded yet</p></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GPS MAP -->
+    <section data-view="gps" class="hidden">
+      <div class="glass card">
+        <div class="module-label">📍 GPS-Based Location Module</div>
+        <h3 class="card-title">Proximity Detection &amp; Precautionary Alert</h3>
+        <p class="card-sub">Identify proximity to alcohol vendors → Trigger Precautionary Alert → BIM.</p>
+
+        <div id="gpsBanner" style="background:rgba(255,61,113,0.12);border:1px solid rgba(255,61,113,0.4);color:var(--danger);padding:12px 16px;border-radius:10px;margin-bottom:14px;font-weight:600;font-size:13px;display:none">
+          <span id="gpsBannerText"></span>
+        </div>
+
+        <div class="risk-legend">
+          <div class="badge bad">🚨 &lt;200m Critical</div>
+          <div class="badge medium">⚠️ &lt;500m High</div>
+          <div class="badge" style="background:rgba(108,71,255,0.12);color:var(--primary2);border:1px solid rgba(108,71,255,0.3)">📍 &lt;1km Medium</div>
+          <div class="badge ok">✅ &gt;1km Safe</div>
+        </div>
+
+        <div class="row" style="margin:14px 0">
+          <button class="btn btn-primary" onclick="locateMe()" id="locateBtn">📍 Detect My Location</button>
+          <button class="btn btn-ghost hidden" onclick="stopTracking()" id="stopBtn">⏹ Stop Tracking</button>
+          <span id="gpsStatus" style="font-size:13px;color:var(--muted)">Click to begin proximity detection.</span>
+        </div>
+
+        <div id="map"></div>
+
+        <div id="gpsBIM" class="bi-box" style="margin-top:14px">
+          <div class="bi-header">🔔 BIM — GPS Proximity Alert</div>
+          <span id="gpsBIMMsg"></span>
+        </div>
+
+        <div id="gpsList" class="log-list" style="margin-top:14px">
+          <div class="empty"><div class="eicon">🗺️</div><p>Detect your location to see nearby alcohol vendors</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INSIGHTS -->
+    <section data-view="insights" class="hidden">
+      <div class="grid-2" style="margin-bottom:18px">
+        <div class="glass card">
+          <div class="module-label">📊 Consumption Insights</div>
+          <h3 class="card-title">Weekly Breakdown</h3>
+          <p class="card-sub">NIAAA Guidelines — dynamically updated from all modules</p>
+          <div class="donut-wrap">
+            <svg id="donutSvg" width="150" height="150" viewBox="0 0 150 150">
+              <circle cx="75" cy="75" r="55" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="18"/>
+              <circle id="donutArc" cx="75" cy="75" r="55" fill="none" stroke="var(--primary)" stroke-width="18" stroke-dasharray="345.4" stroke-dashoffset="345.4" stroke-linecap="round"/>
+            </svg>
+            <div class="donut-center"><div><div class="donut-num" id="donutPct" style="color:var(--primary2)">0%</div><div class="donut-lbl">consumed</div></div></div>
+          </div>
+          <div class="stat-row"><span class="lbl">Daily Allowance</span><span class="val" id="inDaily">—</span></div>
+          <div class="stat-row"><span class="lbl">Weekly Limit</span><span class="val" id="inLimit">—</span></div>
+          <div class="stat-row"><span class="lbl">Used This Week</span><span class="val" id="inUsed">— units</span></div>
+          <div class="stat-row"><span class="lbl">Remaining</span><span class="val" style="color:var(--success)" id="inRem">—</span></div>
+          <div class="progress" style="margin-top:14px"><div id="inProgress" style="width:0%;background:linear-gradient(90deg,var(--success),var(--warning),var(--danger))"></div></div>
+        </div>
+
+        <div class="glass card">
+          <div class="module-label">📋 Activity Breakdown</div>
+          <h3 class="card-title">Cross-Module Event Summary</h3>
+          <p class="card-sub">Events from all 4 monitoring modules</p>
+          <div class="stat-row"><span class="lbl">✅ Approved Payments</span><span class="val" id="inTxn">0</span></div>
+          <div class="stat-row"><span class="lbl">🚫 Blocked Payments</span><span class="val" style="color:var(--danger)" id="inBlocked">0</span></div>
+          <div class="stat-row"><span class="lbl">📱 External SMS Flags</span><span class="val" style="color:var(--warning)" id="inSms">0</span></div>
+          <div class="stat-row"><span class="lbl">🧾 OCR Alcohol Bills</span><span class="val" style="color:var(--warning)" id="inOcr">0</span></div>
+          <div id="insightBIM" class="bi-box" style="margin-top:16px">
+            <div class="bi-header">🔔 BIM — Continuous Tracking Threshold Check</div>
+            <span id="insightBIMMsg">Loading…</span>
+          </div>
+          <div style="margin-top:16px">
+            <h4 style="font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">NIAAA Weekly Limits</h4>
+            <div class="stat-row"><span class="lbl">Male weekly limit</span><span class="val mono">14 units</span></div>
+            <div class="stat-row"><span class="lbl">Female weekly limit</span><span class="val mono">10 units</span></div>
+            <div class="stat-row"><span class="lbl">1 unit =</span><span class="val mono" style="font-size:11px;color:var(--muted)">1 beer / 1 glass wine / 1 shot</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass card">
+        <div class="module-label">📊 System Impact Charts</div>
+        <h3 class="card-title">Effectiveness Metrics</h3>
+        <p class="card-sub">Visual effectiveness of AlcoShield across all modules</p>
+        <div class="grid-3">
+          <div class="impact-chart">
+            <div class="ic-title">Daily Consumption vs Daily Limit</div>
+            <div class="mini-bars" id="dailyBars"><div style="color:var(--muted2);font-size:11px;padding-top:20px">Loading…</div></div>
+            <div style="display:flex;justify-content:space-between;margin-top:4px">
+              <span style="font-size:9px;color:var(--muted2)">Day 1</span>
+              <span style="font-size:9px;color:var(--muted2)">Day 7</span>
+            </div>
+            <div class="row" style="gap:12px;margin-top:8px">
+              <span style="font-size:10px;color:var(--success)">■ Consumed</span>
+              <span style="font-size:10px;color:var(--danger)">— Daily Limit</span>
+            </div>
+          </div>
+
+          <div class="impact-chart">
+            <div class="ic-title">Transaction Control — Blocked vs Allowed</div>
+            <div style="display:flex;gap:12px;justify-content:center;margin:16px 0">
+              <div style="text-align:center"><div id="chartApprNum" style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--success)">0</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Allowed</div></div>
+              <div style="width:1px;background:var(--border2)"></div>
+              <div style="text-align:center"><div id="chartBlockNum" style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--danger)">0</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Blocked</div></div>
+            </div>
+            <div class="bar-row"><span class="bl" style="color:var(--success)">Allowed</span><div class="bt"><div class="bf" id="c2ApprBar" style="background:var(--success);width:0%"></div></div><span class="bv" id="c2ApprPct" style="color:var(--success)">0%</span></div>
+            <div class="bar-row"><span class="bl" style="color:var(--danger)">Blocked</span><div class="bt"><div class="bf" id="c2BlockBar" style="background:var(--danger);width:0%"></div></div><span class="bv" id="c2BlockPct" style="color:var(--danger)">0%</span></div>
+          </div>
+
+          <div class="impact-chart">
+            <div class="ic-title">BIM Effectiveness — Compliance Rate</div>
+            <div style="text-align:center;padding:8px 0">
+              <div id="behaviorScore" style="font-family:'Bebas Neue',sans-serif;font-size:42px;color:var(--accent)">—</div>
+              <div style="font-size:10px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase">Responsibility Score</div>
+            </div>
+            <div class="stat-row" style="margin-top:8px"><span class="lbl">Compliance Rate</span><span class="val" id="complianceRate">—</span></div>
+            <div class="stat-row"><span class="lbl">BIM Nudges Sent</span><span class="val" id="jitaiCount">—</span></div>
+            <div style="margin-top:8px;font-size:11px;color:var(--muted)">Score = 100 − blocked%. Improves as blocked transactions decrease.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════
+   GLOBALS
+══════════════════════════════════════════════════════ */
+const API = "http://127.0.0.1:5000";
+let currentUser     = null;
+let watchId         = null;
+let predictDebounce = null;
+let continuousTimer = null;
+let lastEmailSent   = {};
+const EMAIL_COOLDOWN = 5 * 60 * 1000;
+
+const $id = id => document.getElementById(id);
+
+/* ── TOAST ── */
+function toast(msg, type = "info", dur = 3500) {
+  const t = $id("toast");
+  t.textContent = msg; t.className = `show ${type}`;
+  clearTimeout(t._t);
+  t._t = setTimeout(() => { t.className = type; }, dur);
+}
+
+/* ── FETCH ── */
+async function api(path, opts = {}) {
+  const r = await fetch(API + path, {
+    credentials: "include",
+    method: opts.method || "GET",
+    headers: (opts.body && !(opts.body instanceof FormData)) ? { "Content-Type": "application/json" } : {},
+    body: opts.body
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || `Error ${r.status}`);
+  return d;
+}
+
+/* ── EMAIL ── */
+function sendEmail(type, message) {
+  if (!currentUser?.email) return;
+  const now = Date.now();
+  if (lastEmailSent[type] && (now - lastEmailSent[type] < EMAIL_COOLDOWN)) return;
+  lastEmailSent[type] = now;
+  emailjs.send("service_imm3for", "template_yu3u9gg", {
+    to_email: currentUser.email, user_name: currentUser.name || "User",
+    message, alert_type: type, time: new Date().toLocaleString("en-IN")
+  }).then(() => toast("📧 Alert email sent!", "ok"))
+    .catch(err => console.warn("EmailJS:", err));
+}
+
+/* ── BIM DISPLAY ── */
+function showBIM(containerId, msgId, intervention) {
+  if (!intervention || !intervention.jitai_msg) return;
+  const box = $id(containerId), span = $id(msgId);
+  if (!box || !span) return;
+  span.textContent = intervention.jitai_msg;
+  box.className = `bi-box show ${intervention.jitai_class || "safe"}`;
+}
+function hideBIM(id) { const b = $id(id); if (b) b.className = "bi-box"; }
+
+/* ══════════════════════════════════════════════════════
+   AUTH
+══════════════════════════════════════════════════════ */
+function switchAuthTab(tab) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  $id("loginForm").classList.toggle("hidden", tab !== "login");
+  $id("registerForm").classList.toggle("hidden", tab !== "register");
+}
+
+async function doLogin() {
+  const email = $id("loginEmail").value.trim(), password = $id("loginPassword").value;
+  const msg   = $id("authMsg");
+  if (!email || !password) { msg.textContent = "Please fill in email and password."; msg.className = "alert err"; return; }
+  const btn = $id("loginBtn"); btn.disabled = true; btn.textContent = "Signing in…";
+  try {
+    const d = await api("/api/login", { method: "POST", body: JSON.stringify({ email, password }) });
+    enterApp(d.user);
+  } catch (e) { msg.textContent = "❌ " + e.message; msg.className = "alert err"; }
+  finally { btn.disabled = false; btn.textContent = "Sign In →"; }
+}
+
+async function doRegister() {
+  const name = $id("regName").value.trim(), email = $id("regEmail").value.trim();
+  const password = $id("regPassword").value, gender = $id("regGender").value;
+  const age = parseInt($id("regAge").value);
+  const msg = $id("authMsg");
+  if (!name || !email || !password) { msg.textContent = "All fields required."; msg.className = "alert err"; return; }
+  if (password.length < 6) { msg.textContent = "Password must be at least 6 chars."; msg.className = "alert err"; return; }
+  if (age <= 21) { msg.textContent = "⛔ ACCESS DENIED — age must be over 21."; msg.className = "alert err"; return; }
+  const btn = $id("registerBtn"); btn.disabled = true; btn.textContent = "Verifying…";
+  try {
+    const d = await api("/api/register", { method: "POST", body: JSON.stringify({ name, email, password, gender, age }) });
+    if (d.initialized) toast(`✅ Account created. Limit: ${d.weekly_limit} units/week.`, "ok", 4000);
+    enterApp(d.user);
+  } catch (e) { msg.textContent = "❌ " + e.message; msg.className = "alert err"; }
+  finally { btn.disabled = false; btn.textContent = "Verify Age & Create Account →"; }
+}
+
+async function doLogout() {
+  try { await api("/api/logout", { method: "POST" }); } catch (_) {}
+  currentUser = null; stopTracking(); stopContinuousTracking();
+  $id("appView").classList.add("hidden");
+  $id("authView").classList.remove("hidden");
+  toast("Logged out.", "info");
+}
+
+function enterApp(user) {
+  currentUser = user;
+  $id("authView").classList.add("hidden");
+  $id("appView").classList.remove("hidden");
+  const ini = (user.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  $id("userAvatar").textContent = ini;
+  $id("userChip").textContent   = user.name || user.email;
+  buildMeter();
+  show("overview");
+  startContinuousTracking();
+}
+
+/* ══════════════════════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════════════════════ */
+function show(view) {
+  document.querySelectorAll("section[data-view]").forEach(s => s.classList.toggle("hidden", s.dataset.view !== view));
+  document.querySelectorAll(".nav-tab").forEach(t => t.classList.toggle("active", t.dataset.view === view));
+  if (view === "overview")    loadOverview();
+  if (view === "transaction") loadTxnHistory();
+  if (view === "sms")         loadSmsHistory();
+  if (view === "ocr")         loadOcrHistory();
+  if (view === "gps")         initMap();
+  if (view === "insights")    loadInsights();
+}
+
+/* ══════════════════════════════════════════════════════
+   CONTINUOUS TRACKING
+══════════════════════════════════════════════════════ */
+function startContinuousTracking() {
+  stopContinuousTracking();
+  continuousTrackingTick();
+  continuousTimer = setInterval(continuousTrackingTick, 30000);
+}
+function stopContinuousTracking() { if (continuousTimer) { clearInterval(continuousTimer); continuousTimer = null; } }
+
+async function continuousTrackingTick() {
+  try {
+    const d = await api("/api/consumption-check");
+    updatePipelineThreshold(d.threshold_exceeded, d.risk);
+    showBIM("overviewBIM", "overviewBIMMsg", d.intervention);
+    if (d.risk === "critical") sendEmail("Limit Exceeded", `🚨 ${d.consumption}/${d.limit} units — weekly limit exceeded.`);
+  } catch (_) {}
+}
+
+function updatePipelineThreshold(exceeded, risk) {
+  const thresh = $id("pipeThresh"), bim = $id("pipeBIM");
+  if (!thresh) return;
+  if (exceeded) { thresh.className = "pipe-icon bad"; if (bim) bim.className = "pipe-icon bad"; }
+  else if (risk !== "low") { thresh.className = "pipe-icon warn"; if (bim) bim.className = "pipe-icon warn"; }
+  else { thresh.className = "pipe-icon ok"; if (bim) bim.className = "pipe-icon active"; }
+}
+
+/* ══════════════════════════════════════════════════════
+   SPEEDOMETER
+══════════════════════════════════════════════════════ */
+const CX = 110, CY = 118, R = 90, START_DEG = 210, SWEEP = 210;
+function deg2rad(d) { return d * Math.PI / 180; }
+function arcPoint(a) { const r = deg2rad(a); return [CX + R * Math.cos(r), CY + R * Math.sin(r)]; }
+function describeArc(s, e) {
+  if (Math.abs(e - s) >= 360) e = s + 359.99;
+  const [x1,y1] = arcPoint(s), [x2,y2] = arcPoint(e);
+  return `M ${x1} ${y1} A ${R} ${R} 0 ${(e-s)>180?1:0} 1 ${x2} ${y2}`;
+}
+
+function buildMeter() {
+  const s = START_DEG, e = s + SWEEP;
+  $id("mBg").setAttribute("d", describeArc(s, e));
+  $id("mSeg1").setAttribute("d", describeArc(s, s + SWEEP*0.5));
+  $id("mSeg2").setAttribute("d", describeArc(s + SWEEP*0.5, s + SWEEP*0.75));
+  $id("mSeg3").setAttribute("d", describeArc(s + SWEEP*0.75, e));
+  const tc = $id("mTicks"); tc.innerHTML = "";
+  for (let i = 0; i <= 10; i++) {
+    const angle = s + (SWEEP/10)*i, [ox,oy] = arcPoint(angle);
+    const ix = CX + (R-12)*Math.cos(deg2rad(angle)), iy = CY + (R-12)*Math.sin(deg2rad(angle));
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1",ox);line.setAttribute("y1",oy);line.setAttribute("x2",ix);line.setAttribute("y2",iy);
+    line.setAttribute("stroke", i%5===0?"rgba(255,255,255,0.4)":"rgba(255,255,255,0.15)");
+    line.setAttribute("stroke-width", i%5===0?"2":"1");
+    tc.appendChild(line);
+  }
+  updateMeter(0,0,0);
+}
+
+function updateMeter(pct, consumed, limit) {
+  const clamped = Math.min(pct, 110);
+  const color = pct>=100?"#ff3d71":pct>=75?"#ffab00":"#00e676";
+  if (pct > 0) {
+    $id("mFill").setAttribute("d", describeArc(START_DEG, START_DEG+(SWEEP*Math.min(clamped,100))/100));
+    $id("mFill").setAttribute("stroke", color);
+  } else $id("mFill").setAttribute("d","");
+  const na = deg2rad(START_DEG+(SWEEP*Math.min(clamped,100))/100);
+  $id("mNeedle").querySelector("line").setAttribute("x2", CX+(R-20)*Math.cos(na));
+  $id("mNeedle").querySelector("line").setAttribute("y2", CY+(R-20)*Math.sin(na));
+  $id("mPct").textContent = Math.round(pct)+"%"; $id("mPct").setAttribute("fill",color);
+  $id("mSub").textContent = `${consumed} / ${limit} units`;
+  const zone = $id("mZone");
+  const styles = {
+    critical:["🚨 Limit Exceeded","rgba(255,23,68,0.15)","var(--critical)","rgba(255,23,68,0.4)","bpulse 1s infinite"],
+    danger:  ["⚠ Danger Zone","rgba(255,61,113,0.12)","var(--danger)","rgba(255,61,113,0.3)","none"],
+    caution: ["⚡ Caution Zone","rgba(255,171,0,0.12)","var(--warning)","rgba(255,171,0,0.3)","none"],
+    safe:    ["✓ Safe Zone","rgba(0,230,118,0.12)","var(--success)","rgba(0,230,118,0.3)","none"],
+  };
+  const key = pct>=100?"critical":pct>=75?"danger":pct>=50?"caution":"safe";
+  const [label,bg,col,border,anim] = styles[key];
+  zone.textContent = label;
+  zone.style.cssText = `background:${bg};color:${col};border:1px solid ${border};animation:${anim};padding:5px 22px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;transition:all .4s`;
+}
+
+/* ══════════════════════════════════════════════════════
+   OVERVIEW
+══════════════════════════════════════════════════════ */
+async function loadOverview() {
+  try {
+    const d = await api("/api/insights"), pct = d.percentage || 0;
+    $id("sc-limit").textContent     = d.limit;
+    $id("sc-consumed").textContent  = d.consumption;
+    $id("sc-remaining").textContent = d.remaining;
+    $id("sc-pct").textContent       = `${pct}% used`;
+    const riskMap = {low:["ok","✓ Low"],medium:["medium","⚡ Medium"],high:["high","⚠ High"],critical:["critical","🚨 Critical"]};
+    const [cls,label] = riskMap[d.risk] || ["ok","Low"];
+    $id("sc-risk").className = `badge ${cls}`; $id("sc-risk").textContent = label;
+    $id("ovTxn").textContent = d.transactions; $id("ovBlocked").textContent = d.blocked;
+    $id("ovSms").textContent = d.sms_flagged;  $id("ovOcr").textContent     = d.ocr_flagged;
+    $id("ovProgress").style.width  = Math.min(pct,100)+"%";
+    $id("ovProgressLabel").textContent = `${d.consumption} / ${d.limit} units consumed this week`;
+    const total=d.transactions+d.blocked, apprPct=total?Math.round(d.transactions/total*100):0, blockPct=total?Math.round(d.blocked/total*100):0;
+    $id("impApprBar").style.width=apprPct+"%"; $id("impApprVal").textContent=apprPct+"%";
+    $id("impBlockBar").style.width=blockPct+"%"; $id("impBlockVal").textContent=blockPct+"%";
+    $id("impSmsBar").style.width=Math.min(d.sms_flagged*10,100)+"%"; $id("impSmsVal").textContent=d.sms_flagged;
+    showBIM("overviewBIM","overviewBIMMsg",d.intervention);
+    updatePipelineThreshold(pct>=100, d.risk);
+    setTimeout(() => updateMeter(pct, d.consumption, d.limit), 150);
+    if (d.risk==="critical") sendEmail("Limit Exceeded",`🚨 ${d.consumption}/${d.limit} units — exceeded.`);
+    else if (d.risk==="high") sendEmail("High Consumption",`⚠️ At ${pct}% of weekly limit.`);
+  } catch (e) { console.error("Overview:", e); }
+}
+
+/* ══════════════════════════════════════════════════════
+   TRANSACTION CONTROL
+══════════════════════════════════════════════════════ */
+function clearPredict() { $id("predictBox").className = "predict-box"; }
+function onUnitsInput() {
+  clearTimeout(predictDebounce);
+  const units = parseFloat($id("txnUnits").value);
+  if (!units || units <= 0) { clearPredict(); return; }
+  predictDebounce = setTimeout(() => runPredict(units), 600);
+}
+async function runPredict(units) {
+  try {
+    const d = await api("/api/predict", { method:"POST", body:JSON.stringify({units}) });
+    const box = $id("predictBox");
+    box.className = `predict-box show ${d.will_exceed?"will-block":"will-approve"}`;
+    $id("predCurrent").textContent = `${d.current_total} units (${d.current_pct}%)`;
+    $id("predAdding").textContent  = `+ ${units} units`;
+    $id("predTotal").textContent   = `${d.predicted_total} units (${d.predicted_pct}%)`;
+    $id("predLimit").textContent   = `${d.limit} units`;
+    const dec = $id("predDecision"); dec.textContent = d.decision; dec.className = d.will_exceed?"badge bad":"badge ok";
+  } catch (_) {}
+}
+function clearTxn() {
+  $id("txnUnits").value=""; $id("txnAmount").value=""; $id("txnVendor").value="";
+  $id("predictBox").className="predict-box"; $id("payGate").className="payment-gate";
+  hideBIM("txnBIM");
+  $id("txnMsg").textContent="ℹ️ Enter vendor, units, and amount."; $id("txnMsg").className="alert info";
+}
+async function submitTxn() {
+  const units=parseFloat($id("txnUnits").value), vendor=$id("txnVendor").value.trim()||"Unknown Vendor";
+  const amount_inr=parseFloat($id("txnAmount").value)||0, msgEl=$id("txnMsg");
+  if (!units||units<=0) { msgEl.textContent="Please enter valid units."; msgEl.className="alert err"; return; }
+  const btn=$id("txnBtn"); btn.disabled=true; btn.textContent="Processing…";
+  const gate=$id("payGate"); gate.className="payment-gate show";
+  $id("pgIcon").textContent="⏳"; $id("pgTitle").textContent="Evaluating…"; $id("pgDetail").textContent=`Checking ${units} units vs weekly limit…`;
+  try {
+    const d = await api("/api/transaction",{method:"POST",body:JSON.stringify({units,vendor,amount_inr})});
+    if (d.status==="approved") {
+      gate.className="payment-gate show approved";
+      $id("pgIcon").textContent="✅"; $id("pgTitle").textContent="Payment Authorized"; $id("pgTitle").style.color="var(--success)";
+      $id("pgDetail").textContent=`${units} unit(s) at ${vendor}${amount_inr?` · ₹${amount_inr}`:""} — ${d.remaining} units remaining`;
+      $id("pgBadge").textContent="APPROVED"; $id("pgBadge").className="badge ok";
+      msgEl.textContent=`✅ Approved — ${d.remaining} units remaining.`; msgEl.className="alert ok";
+      toast(`✅ Payment approved — ${units} units`,"ok");
+    } else {
+      gate.className="payment-gate show blocked";
+      $id("pgIcon").textContent="🚫"; $id("pgTitle").textContent="Payment BLOCKED"; $id("pgTitle").style.color="var(--critical)";
+      $id("pgDetail").textContent=`Exceeds weekly limit. ${d.remaining} units remaining.`;
+      $id("pgBadge").textContent="BLOCKED — LIMIT EXCEEDED"; $id("pgBadge").className="badge critical";
+      msgEl.textContent=`🚫 BLOCKED — would exceed weekly limit.`; msgEl.className="alert err";
+      toast("🚫 Payment blocked!","err",5000);
+      sendEmail("Payment Blocked",`🚫 ${units} unit(s) at "${vendor}"${amount_inr?` (₹${amount_inr})`:""} BLOCKED.\nRemaining: ${d.remaining} units.`);
+    }
+    showBIM("txnBIM","txnBIMMsg",d.intervention);
+    $id("txnUnits").value=""; $id("txnAmount").value=""; $id("txnVendor").value="";
+    $id("predictBox").className="predict-box";
+    loadTxnHistory(); loadOverview();
+  } catch (e) { gate.className="payment-gate"; msgEl.textContent="❌ "+e.message; msgEl.className="alert err"; }
+  finally { btn.disabled=false; btn.textContent="⚡ Authorize Payment"; }
+}
+async function loadTxnHistory() {
+  try {
+    const rows = await api("/api/history"), el = $id("txnList");
+    if (!rows.length) { el.innerHTML='<div class="empty"><div class="eicon">📋</div><p>No transactions yet</p></div>'; return; }
+    el.innerHTML = rows.map(r=>`
+      <div class="log-item ${r.status==='approved'?'ok':'bad'}">
+        <div class="li-title">${r.status==='approved'?'✅':'🚫'} ${r.units} unit(s)${r.vendor_name?` <span style="color:var(--muted);font-weight:400">· ${r.vendor_name}</span>`:""}<span class="badge ${r.status==='approved'?'ok':'bad'}" style="float:right;font-size:10px">${r.status==='approved'?'APPROVED':'BLOCKED'}</span></div>
+        <div class="li-meta mono">${r.amount_inr?`₹${r.amount_inr} · `:""}${r.created_at?new Date(r.created_at).toLocaleString("en-IN"):"Just now"}</div>
+      </div>`).join("");
+  } catch (e) { console.error(e); }
+}
+
+/* ══════════════════════════════════════════════════════
+   SMS MONITOR
+══════════════════════════════════════════════════════ */
+function loadSampleSms() {
+  $id("smsText").value  ="Dear Customer, Rs. 1,240.00 debited from A/c XX4821 at THE SPIRITS LOUNGE via UPI on 25-Apr-26. Avl Bal: Rs. 8,230.50.";
+  $id("smsSender").value="HDFC-BANK"; $id("smsAmount").value="1240";
+  $id("smsMsg").textContent="Sample loaded — click Scan & Extract."; $id("smsMsg").className="alert info"; hideBIM("smsBIM");
+}
+async function scanSms() {
+  const text=$id("smsText").value.trim(), msgEl=$id("smsMsg");
+  if (!text) { msgEl.textContent="Please enter an SMS message."; msgEl.className="alert err"; return; }
+  msgEl.textContent="🔍 Scanning for alcohol keywords…"; msgEl.className="alert info"; hideBIM("smsBIM");
+  try {
+    const d=await api("/api/sms-scan",{method:"POST",body:JSON.stringify({text,sender:$id("smsSender").value||"Unknown",amount:parseFloat($id("smsAmount").value)||0})});
+    if (d.alcohol) {
+      let detail=`⚠️ Alcohol-related external UPI transaction detected!`;
+      if (d.estimated_units>0) { detail+=` Estimated ${d.estimated_units} unit(s) added to tracking.`; if (d.payment_status==="over_limit") detail+=" ⚠️ Now OVER weekly limit."; }
+      msgEl.textContent=detail; msgEl.className="alert warn";
+      toast("⚠️ Alcohol SMS flagged","warn");
+      sendEmail("External Alcohol Purchase",`⚠️ SMS alcohol detected.\nAmount: ₹${$id("smsAmount").value||"?"}\nEstimated: ${d.estimated_units} units`);
+      showBIM("smsBIM","smsBIMMsg",d.intervention);
+    } else { msgEl.textContent="✅ No alcohol detected."; msgEl.className="alert ok"; hideBIM("smsBIM"); }
+    $id("smsText").value=""; $id("smsAmount").value=""; loadSmsHistory(); loadOverview();
+  } catch (e) { msgEl.textContent="❌ "+e.message; msgEl.className="alert err"; }
+}
+async function loadSmsHistory() {
+  try {
+    const rows=await api("/api/sms-history"), el=$id("smsList");
+    if (!rows.length) { el.innerHTML='<div class="empty"><div class="eicon">📱</div><p>No SMS scanned yet</p></div>'; return; }
+    el.innerHTML=rows.map(r=>`
+      <div class="log-item ${r.alcohol?'warn':'ok'}">
+        <div class="li-title">${r.alcohol?'⚠️ Alcohol Flagged':'✅ Clean'} — ${r.sender||'Unknown'}${r.amount?` <span style="color:var(--muted);font-weight:400">· ₹${r.amount}</span>`:""}${r.estimated_units>0?`<span class="badge medium" style="float:right;font-size:10px">~${r.estimated_units} units</span>`:""}</div>
+        <div class="li-meta">${(r.text||"").slice(0,80)}${(r.text||"").length>80?"…":""}</div>
+        <div class="li-meta mono">${r.created_at?new Date(r.created_at).toLocaleString("en-IN"):"Just now"}</div>
+      </div>`).join("");
+  } catch (e) { console.error(e); }
+}
+
+/* ══════════════════════════════════════════════════════
+   OCR BILLS — CLAUDE VISION AI
+══════════════════════════════════════════════════════ */
+// Drag-and-drop
+const dropZone = $id("ocrDropZone");
+['dragenter','dragover'].forEach(ev => dropZone.addEventListener(ev, e => {
+  e.preventDefault(); dropZone.classList.add("dragover");
+}));
+['dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, e => {
+  e.preventDefault(); dropZone.classList.remove("dragover");
+}));
+dropZone.addEventListener("drop", e => {
+  const f = e.dataTransfer.files[0]; if (f) processOcrFile(f);
+});
+
+async function uploadOcr(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  processOcrFile(file);
+  e.target.value = "";
+}
+
+function resetOcrPanel() {
+  $id("ocrResultPanel").className   = "ocr-result-panel";
+  $id("ocrProcessing").className    = "ai-processing";
+  $id("ocrBIM").className           = "bi-box";
+  $id("ocrManualLogCTA").style.display = "none";
+  $id("ocrAiNote").style.display    = "none";
+  $id("ocrAutoLog").style.display   = "none";
+  $id("ocrPreview").style.display   = "none";
+  $id("ocrTextSection").style.display = "none";
+  $id("ocrShowAllBtn").style.display  = "none";
+  $id("ocrAllItemsSection").style.display = "none";
+}
+
+function toggleAllItems() {
+  const sec = $id("ocrAllItemsSection"), btn = $id("ocrShowAllBtn");
+  if (sec.style.display === "none") {
+    sec.style.display = "block"; btn.style.display = "none";
+  } else {
+    sec.style.display = "none"; btn.style.display = "block";
+  }
+}
+
+function toggleOcrText() {
+  const wrap = $id("ocrTextPreviewWrap");
+  wrap.style.display = wrap.style.display === "none" ? "block" : "none";
+}
+
+async function processOcrFile(file) {
+  if (!file.type.startsWith("image/")) {
+    toast("Please upload an image file (PNG, JPG, JPEG)", "warn");
+    return;
+  }
+
+  resetOcrPanel();
+
+  // Show image preview
+  const reader = new FileReader();
+  reader.onload = e => {
+    $id("ocrPreview").src = e.target.result;
+    $id("ocrPreview").style.display = "block";
+  };
+  reader.readAsDataURL(file);
+
+  // Start scan bar + processing spinner
+  $id("ocrScanBar").classList.add("scanning");
+  $id("ocrProcessing").className = "ai-processing show";
+
+  const fd = new FormData();
+  fd.append("file", file);
+
+  try {
+    const d = await api("/api/ocr", { method: "POST", body: fd });
+    renderOcrResult(d, file.name);
+  } catch (e) {
+    $id("ocrProcessing").className = "ai-processing";
+    toast("❌ OCR Error: " + e.message, "err");
+  } finally {
+    $id("ocrScanBar").classList.remove("scanning");
+    $id("ocrProcessing").className = "ai-processing";
+    loadOcrHistory();
+    loadOverview();
+  }
+}
+
+function renderOcrResult(d, filename) {
+  const panel  = $id("ocrResultPanel");
+  const header = $id("ocrResultHeader");
+  const isAlco = d.detected;
+
+  // Panel + header style
+  panel.className  = `ocr-result-panel show ${isAlco ? "alcohol" : "clean"}`;
+  header.className = `ocr-result-header ${isAlco ? "alcohol" : "clean"}`;
+
+  // Icon & title
+  $id("ocrResultIcon").textContent = isAlco ? "🍷" : "✅";
+  $id("ocrResultTitle").textContent = isAlco
+    ? "⚠️ Alcohol Detected in Receipt"
+    : "✅ No Alcohol — Clean Receipt";
+  $id("ocrResultSub").textContent = d.analysis_summary || (isAlco ? "Alcohol items found" : "Non-alcoholic purchase verified");
+
+  // Method badge
+  const methodBadge = $id("ocrMethodBadge");
+  const method      = (d.method_used || "unknown").toUpperCase();
+  methodBadge.textContent = `🤖 ${method}`;
+  methodBadge.className   = `badge ${isAlco ? "medium" : "ai"}`;
+
+  // Confidence note
+  if (d.confidence) {
+    const noteEl = $id("ocrAiNote");
+    const confColor = d.confidence === "high" ? "var(--success)" : d.confidence === "medium" ? "var(--warning)" : "var(--danger)";
+    noteEl.innerHTML = `AI Confidence: <strong style="color:${confColor}">${d.confidence.toUpperCase()}</strong>${d.ai_error ? ` · <span style="color:var(--danger)">Error: ${d.ai_error}</span>` : ""}`;
+    noteEl.style.display = "block";
+  }
+
+  // Detail cells
+  $id("ocrVendorVal").textContent = d.vendor_name || (d.filename || filename);
+  $id("ocrDateVal").textContent   = d.bill_date || "Not detected";
+  $id("ocrAmountVal").textContent = d.amount_found > 0 ? `₹${d.amount_found.toFixed(0)}` : "Not found";
+  $id("ocrAmountVal").style.color = d.amount_found > 0 ? "var(--accent)" : "var(--muted)";
+  $id("ocrUnitsVal").textContent  = d.estimated_units > 0 ? `~${d.estimated_units} units` : "—";
+  $id("ocrUnitsVal").style.color  = d.estimated_units > 0 ? "var(--warning)" : "var(--muted)";
+
+  // Alcohol items
+  const alcoSection = $id("ocrAlcoholSection");
+  const alcoItems   = $id("ocrAlcoholItems");
+  if (isAlco && d.items_found && d.items_found.length > 0) {
+    alcoSection.style.display = "block";
+    alcoItems.innerHTML = d.items_found.map(item =>
+      `<span class="ocr-item-pill">🍷 ${item}</span>`
+    ).join("");
+  } else if (isAlco) {
+    alcoSection.style.display = "block";
+    alcoItems.innerHTML = `<span class="ocr-item-pill">⚠️ Alcohol detected (items not individually listed)</span>`;
+  } else {
+    alcoSection.style.display = "none";
+  }
+
+  // All bill items
+  const allItems = d.all_items || [];
+  if (allItems.length > 0) {
+    $id("ocrAllItems").innerHTML = allItems.map(item =>
+      `<span class="ocr-item-pill clean">📋 ${item}</span>`
+    ).join("");
+    $id("ocrShowAllBtn").style.display = "block";
+  }
+
+  // Auto-log status
+  if (d.auto_logged && d.estimated_units > 0) {
+    $id("ocrAutoLog").style.display = "block";
+    $id("ocrAutoLogBadge").textContent = `✅ ${d.estimated_units} units auto-logged to consumption tracking`;
+    $id("ocrAutoLogBadge").className = "auto-log-badge";
+  } else if (isAlco && !d.auto_logged) {
+    $id("ocrManualLogCTA").style.display = "block";
+  }
+
+  // AI Summary
+  $id("ocrSummaryText").textContent = d.analysis_summary || "—";
+
+  // OCR text preview (collapsible)
+  if (d.ocr_text_preview && d.ocr_text_preview.length > 5) {
+    $id("ocrTextSection").style.display = "block";
+    $id("ocrTextPreview").textContent   = d.ocr_text_preview;
+    $id("ocrTextPreviewWrap").style.display = "none"; // collapsed by default
+  }
+
+  // BIM
+  showBIM("ocrBIM", "ocrBIMMsg", d.intervention);
+
+  // Toast & email
+  if (isAlco) {
+    toast("🧾 Alcohol detected in receipt!", "warn");
+    const items   = (d.items_found || []).join(", ") || "alcohol items";
+    const amtStr  = d.amount_found > 0 ? ` · ₹${d.amount_found.toFixed(0)}` : "";
+    const unitStr = d.estimated_units > 0 ? ` · ${d.estimated_units} units logged` : "";
+    sendEmail("Alcohol in Receipt",
+      `🧾 [${method}] Alcohol detected in "${d.filename || filename}".\nItems: ${items}${amtStr}${unitStr}\nSummary: ${d.analysis_summary || ""}`
+    );
+  } else {
+    toast("✅ Receipt clear — no alcohol", "ok");
+  }
+}
+
+async function loadOcrHistory() {
+  try {
+    const rows = await api("/api/ocr-history"), el = $id("ocrList");
+    if (!rows.length) {
+      el.innerHTML = '<div class="empty"><div class="eicon">📄</div><p>No bills uploaded yet</p></div>';
+      return;
+    }
+    el.innerHTML = rows.map(r => `
+      <div class="log-item ${r.detected ? "warn" : "ok"}">
+        <div class="li-title">
+          ${r.detected ? "⚠️ Alcohol Detected" : "✅ No Alcohol"}
+          <span class="badge ${r.detected ? "medium" : "ok"}" style="float:right;font-size:10px">${r.detected ? "FLAGGED" : "CLEAN"}</span>
+        </div>
+        <div class="li-meta mono">📄 ${r.filename}</div>
+        <div class="li-meta">${r.ocr_text ? r.ocr_text.slice(0,80) + "…" : "AI analyzed"}</div>
+        <div class="li-meta mono">${r.created_at ? new Date(r.created_at).toLocaleString("en-IN") : "Just now"}</div>
+      </div>`).join("");
+  } catch (e) { console.error(e); }
+}
+
+/* ══════════════════════════════════════════════════════
+   GPS MAP
+══════════════════════════════════════════════════════ */
+function initMap() {
+  if (window._leafMap) return;
+  window._leafMap = L.map("map").setView([12.9716, 77.5946], 13);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    attribution: "© OpenStreetMap © CARTO", maxZoom: 19
+  }).addTo(window._leafMap);
+  window._leafMap._vendorMarkers = [];
+  window._leafMap._circles       = [];
+}
+
+function locateMe() {
+  if (!navigator.geolocation) { toast("Geolocation not supported.", "err"); return; }
+  $id("locateBtn").disabled    = true;
+  $id("locateBtn").textContent = "📡 Detecting…";
+  $id("stopBtn").classList.remove("hidden");
+  $id("gpsStatus").textContent = "GPS tracking active…";
+  watchId = navigator.geolocation.watchPosition(onPosition, onGeoError, {
+    enableHighAccuracy: true, maximumAge: 10000, timeout: 15000
+  });
+}
+
+function stopTracking() {
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+  $id("locateBtn").disabled    = false;
+  $id("locateBtn").textContent = "📍 Detect My Location";
+  $id("stopBtn").classList.add("hidden");
+  $id("gpsStatus").textContent = "Tracking stopped.";
+  $id("gpsBanner").style.display = "none";
+  hideBIM("gpsBIM");
+}
+
+function onGeoError(err) {
+  toast("GPS error: " + err.message, "err");
+  $id("gpsStatus").textContent = "GPS error — check browser permissions.";
+  stopTracking();
+}
+
+async function onPosition(pos) {
+  const lat = pos.coords.latitude, lng = pos.coords.longitude;
+  if (!window._leafMap) initMap();
+  window._leafMap.setView([lat, lng], 14);
+
+  if (window._userMarker) window._userMarker.remove();
+  const pulseIcon = L.divIcon({
+    html: `<div style="width:18px;height:18px;border-radius:50%;background:var(--primary);box-shadow:0 0 0 6px rgba(108,71,255,0.25),0 0 24px rgba(108,71,255,0.5)"></div>`,
+    className: "", iconSize: [18, 18]
+  });
+  window._userMarker = L.marker([lat, lng], { icon: pulseIcon })
+    .addTo(window._leafMap).bindPopup("📍 You are here").openPopup();
+
+  $id("locateBtn").disabled    = false;
+  $id("locateBtn").textContent = "📍 Update Location";
+  $id("gpsStatus").textContent = `📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+  try {
+    const d = await api("/api/gps", { method: "POST", body: JSON.stringify({ lat, lng }) });
+    renderVendors(d.nearby, d.risk_summary, d.current_pct);
+    handleGpsAlert(d);
+  } catch (e) {
+    console.error("GPS API:", e);
+    $id("gpsStatus").textContent = "GPS API error — check backend.";
+  }
+}
+
+const RISK_CONFIG = {
+  critical: { color: "#ff1744", emoji: "🚨", label: "CRITICAL (<200m)", badgeCls: "bad" },
+  high:     { color: "#ffab00", emoji: "⚠️",  label: "HIGH (<500m)",    badgeCls: "medium" },
+  medium:   { color: "#8b6fff", emoji: "📍",  label: "MEDIUM (<1km)",   badgeCls: "" },
+  low:      { color: "#00e676", emoji: "✅",  label: "SAFE (>1km)",     badgeCls: "ok" },
+};
+
+function renderVendors(vendors, riskSummary, currentPct) {
+  if (!vendors || !vendors.length) return;
+  const listEl = $id("gpsList");
+  const m      = window._leafMap;
+
+  if (m._vendorMarkers) m._vendorMarkers.forEach(mk => mk.remove());
+  if (m._circles)       m._circles.forEach(c => c.remove());
+  m._vendorMarkers = []; m._circles = [];
+
+  vendors.forEach(v => {
+    const cfg  = RISK_CONFIG[v.proximity_risk] || RISK_CONFIG.low;
+    const size = v.proximity_risk === "critical" ? 18 : v.proximity_risk === "high" ? 14 : 10;
+    const icon = L.divIcon({
+      html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${cfg.color};box-shadow:0 0 8px ${cfg.color};border:2px solid rgba(255,255,255,0.25)"></div>`,
+      className: "", iconSize: [size, size]
+    });
+    const mk = L.marker([v.lat, v.lng], { icon }).addTo(m).bindPopup(`
+      <div style="min-width:160px">
+        <b style="color:${cfg.color}">${cfg.emoji} ${v.name}</b><br>
+        <span style="font-size:12px">${v.distance}m away</span><br>
+        <span style="font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:${cfg.color}">${cfg.label}</span>
+      </div>
+    `);
+    m._vendorMarkers.push(mk);
+
+    if (v.proximity_risk === "critical" || v.proximity_risk === "high") {
+      const radius = v.proximity_risk === "critical" ? 200 : 500;
+      const circle = L.circle([v.lat, v.lng], {
+        radius, color: cfg.color, fillColor: cfg.color,
+        fillOpacity: 0.06, weight: 1.5, dashArray: "6, 4"
+      }).addTo(m);
+      m._circles.push(circle);
+    }
+  });
+
+  let summaryHtml = "";
+  if (riskSummary) {
+    const parts = [
+      riskSummary.critical > 0 ? `<span class="badge bad">🚨 ${riskSummary.critical} Critical</span>` : "",
+      riskSummary.high     > 0 ? `<span class="badge medium">⚠️ ${riskSummary.high} High</span>` : "",
+      riskSummary.medium   > 0 ? `<span class="badge" style="background:rgba(108,71,255,0.12);color:var(--primary2);border:1px solid rgba(108,71,255,0.3)">📍 ${riskSummary.medium} Medium</span>` : "",
+      riskSummary.low      > 0 ? `<span class="badge ok">✅ ${riskSummary.low} Safe</span>` : "",
+    ].filter(Boolean).join("");
+    summaryHtml = `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;align-items:center">
+        <span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Nearby Vendors:</span>
+        ${parts}
+        <span style="margin-left:auto;font-size:11px;color:var(--muted)">Your weekly usage: ${(currentPct||0).toFixed(0)}%</span>
+      </div>`;
+  }
+
+  listEl.innerHTML = summaryHtml + vendors.slice(0, 10).map(v => {
+    const cfg  = RISK_CONFIG[v.proximity_risk] || RISK_CONFIG.low;
+    const desc = v.proximity_risk === "critical" ? "🚨 CRITICAL — you are extremely close! Do NOT make an alcohol purchase."
+               : v.proximity_risk === "high"     ? "⚠️ HIGH RISK — beware of impulse buying."
+               : v.proximity_risk === "medium"   ? "📍 Medium proximity — stay mindful of your weekly limits."
+               :                                   "✅ Safe distance — no immediate risk.";
+    return `
+      <div class="log-item ${v.proximity_risk==="critical"?"bad":v.proximity_risk==="high"?"warn":""}">
+        <div class="li-title">
+          ${cfg.emoji} ${v.name}
+          <span style="float:right;font-size:10px;padding:2px 10px;border-radius:99px;background:rgba(0,0,0,0.2);color:${cfg.color};border:1px solid ${cfg.color}40;font-weight:700;text-transform:uppercase;letter-spacing:.04em">${cfg.label}</span>
+        </div>
+        <div class="li-meta">${v.distance}m away · ${desc}</div>
+      </div>`;
+  }).join("");
+}
+
+function handleGpsAlert(d) {
+  const banner   = $id("gpsBanner");
+  const bannerTx = $id("gpsBannerText");
+  if (d.intervention && d.intervention.jitai_msg) showBIM("gpsBIM", "gpsBIMMsg", d.intervention);
+
+  if (d.gps_alert) {
+    banner.style.display = "block";
+    bannerTx.textContent = d.intervention?.jitai_msg || "";
+    const prisk = d.nearby?.[0]?.proximity_risk;
+    if (prisk === "critical") {
+      sendEmail("Critical GPS Alert", `🚨 CRITICAL: Only ${d.nearby[0].distance}m from "${d.nearby[0].name}".\n${d.intervention?.jitai_msg || ""}`);
+    } else {
+      sendEmail("GPS Proximity Warning", `⚠️ Near alcohol vendor.\n${d.intervention?.jitai_msg || ""}`);
+    }
+  } else {
+    banner.style.display = "none";
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   INSIGHTS
+══════════════════════════════════════════════════════ */
+async function loadInsights() {
+  try {
+    const d=await api("/api/insights"), st=await api("/api/stats"), pct=d.percentage||0;
+    $id("inDaily").textContent=`${d.daily_allowance} units/day`; $id("inLimit").textContent=`${d.limit} units`;
+    $id("inUsed").textContent=`${d.consumption} units`; $id("inRem").textContent=`${d.remaining} units`;
+    $id("inTxn").textContent=d.transactions; $id("inBlocked").textContent=d.blocked;
+    $id("inSms").textContent=d.sms_flagged; $id("inOcr").textContent=d.ocr_flagged;
+    $id("inProgress").style.width=Math.min(pct,100)+"%";
+    const circ=2*Math.PI*55, offset=circ*(1-Math.min(pct,100)/100);
+    const arcEl=$id("donutArc");
+    arcEl.style.strokeDashoffset=offset;
+    const dc=pct>=100?"var(--critical)":pct>=75?"var(--danger)":pct>=50?"var(--warning)":"var(--primary)";
+    arcEl.style.stroke=dc; $id("donutPct").textContent=Math.round(pct)+"%"; $id("donutPct").style.color=dc;
+    showBIM("insightBIM","insightBIMMsg",d.intervention);
+    renderDailyBars(st.daily_units,st.daily_limit);
+    $id("chartApprNum").textContent=st.total_approved; $id("chartBlockNum").textContent=st.total_blocked;
+    $id("c2ApprBar").style.width=st.approved_pct+"%"; $id("c2ApprPct").textContent=st.approved_pct+"%";
+    $id("c2BlockBar").style.width=st.blocked_pct+"%"; $id("c2BlockPct").textContent=st.blocked_pct+"%";
+    const score=Math.round(100-st.blocked_pct);
+    $id("behaviorScore").textContent=score+"%"; $id("behaviorScore").style.color=score>=80?"var(--success)":score>=60?"var(--warning)":"var(--danger)";
+    $id("complianceRate").textContent=score+"%"; $id("jitaiCount").textContent=d.transactions+d.blocked+d.sms_flagged;
+  } catch (e) { console.error("Insights:",e); }
+}
+
+function renderDailyBars(daily_units, daily_limit) {
+  const wrap=$id("dailyBars");
+  if (!daily_units?.length) return;
+  const maxVal=Math.max(...daily_units,daily_limit,1);
+  const days=["M","T","W","T","F","S","S"];
+  wrap.innerHTML=daily_units.map((val,i)=>{
+    const hp=Math.round((val/maxVal)*100), lp=Math.round((daily_limit/maxVal)*100);
+    const color=val>=daily_limit?"var(--danger)":val>=daily_limit*0.7?"var(--warning)":"var(--success)";
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+      <div style="width:100%;height:60px;display:flex;align-items:flex-end;position:relative">
+        <div style="width:100%;height:${hp}%;background:${color};border-radius:3px 3px 0 0;min-height:2px;transition:height .5s"></div>
+        <div style="position:absolute;bottom:${lp}%;left:0;right:0;border-top:1px dashed rgba(255,61,113,0.5)"></div>
+      </div>
+      <span style="font-size:9px;color:var(--muted2)">${days[i]}</span>
+      <span style="font-size:9px;color:var(--muted)">${val>0?val:""}</span>
+    </div>`;
+  }).join("");
+}
+
+/* ══════════════════════════════════════════════════════
+   RESET
+══════════════════════════════════════════════════════ */
+async function confirmReset() {
+  if (!confirm("⚠️ Reset all data? This permanently deletes all transactions, SMS logs, and OCR history.")) return;
+  try { await api("/api/reset",{method:"POST"}); toast("All data reset.","ok"); loadOverview(); }
+  catch (e) { toast("Reset failed: "+e.message,"err"); }
+}
+</script>
+</body>
+</html>
